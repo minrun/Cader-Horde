@@ -44,7 +44,8 @@ local startXpMult = HORDE.Difficulty[HORDE.CurrentDifficulty].xpMultiStart
 local endXpMult = HORDE.Difficulty[HORDE.CurrentDifficulty].xpMultiEnd
 local endMinusStartXp = endXpMult - startXpMult
 local maxLevel = HORDE.max_level
-local healXpPercentage = 0.25
+local healXpPercentage = 0.02
+local armorXpPercentage = 0.02
 
 function plymeta:Horde_AddHealAmount( amount )
     if HORDE.current_wave <= 0 then return end
@@ -55,7 +56,7 @@ function plymeta:Horde_AddHealAmount( amount )
 
     local wavePercent = HORDE.current_wave / HORDE.max_waves
     local roundXpMult = startXpMult + ( wavePercent * endMinusStartXp ) -- This gets the xp multi number between min and max multi based on round
-    local expMult = roundXpMult * expMultiConvar:GetInt()
+    local expMult = roundXpMult * expMultiConvar:GetInt() / 2
 
     self:Horde_GiveExp( subclass, healXpPercentage * amount * expMult, "Healed Player" )
 end
@@ -130,4 +131,43 @@ function HORDE:SelfHeal( ply, amount )
 
     local healinfo = HealInfo:New( { amount = amount, healer = ply } )
     HORDE:OnPlayerHeal( ply, healinfo )
+end
+
+local function armorerDoGiveXp( armorer, armorGiven )
+    if armorGiven < 0 then return end
+
+    if not IsValid( armorer ) then return end
+    if not armorer:IsPlayer() then return end
+
+    if HORDE.current_wave <= 0 then return end
+    if HORDE:InBreak() then return end
+
+    local subclass = armorer:Horde_GetCurrentSubclass()
+    if armorer:Horde_GetLevel( subclass ) >= maxLevel then return end
+
+    local wavePercent = HORDE.current_wave / HORDE.max_waves
+    local roundXpMult = startXpMult + wavePercent * endMinusStartXp
+    local expMult = roundXpMult * expMultiConvar:GetInt() / 2
+
+    local rewardMult = armorXpPercentage * armorGiven * math.max( 1, expMult )
+
+    armorer:Horde_GiveExp( subclass, rewardMult, "Provided Armor" )
+end
+
+function plymeta:Horde_GiveArmor( armorAmount, armorer )
+    if not self:Alive() then return end
+
+    local armor = self:Armor()
+    local maxArmor = self:GetMaxArmor()
+
+    if armor >= maxArmor then return end
+
+    local armorGiven = math.min( maxArmor, armor + armorAmount )
+    local armorDiff = armorGiven - armorAmount
+
+    if armorer ~= self then
+        armorerDoGiveXp( armorer, armorDiff )
+    end
+
+    self:SetArmor( armorGiven )
 end
