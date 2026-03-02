@@ -8,7 +8,7 @@ ENT.Instructions 	= "Click on the spawnicon to spawn it."
 ENT.Category		= "Horde"
 
 if (CLIENT) then
-	local Name = "Barricade"
+	local Name = "Metal Barricade"
 	local LangName = "npc_vj_horde_barricade_metal"
 	language.Add(LangName, Name)
 	killicon.Add(LangName,"HUD/killicons/default",Color(255,80,0,255))

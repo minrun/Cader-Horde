@@ -7,17 +7,25 @@ include('shared.lua')
 -----------------------------------------------*/
 ENT.Model = "models/props_c17/concrete_barrier001a.mdl" -- The game will pick a random model from the table when the SNPC is spawned | Add as many as you want
 ENT.StartHealth = 2400
-ENT.SightDistance = 50
-ENT.HullType = HULL_HUMAN
+ENT.SightDistance = 500
+ENT.HullType = HULL_WIDE_SHORT
 ENT.MovementType = VJ_MOVETYPE_STATIONARY
-ENT.SightAngle = 90 -- The sight angle | Example: 180 would make the it see all around it | Measured in degrees and then converted to radians
+ENT.SightAngle = 180 -- The sight angle | Example: 180 would make the it see all around it | Measured in degrees and then converted to radians
 ENT.LastSeenEnemyTimeUntilReset = 60 -- Time until it resets its enemy if its current enemy is not visible
 ---------------------------------------------------------------------------------------------------------------------------------------------
-ENT.VJ_NPC_Class = {"CLASS_COMBINE"} -- NPCs with the same class with be allied to each other
+ENT.VJ_NPC_Class = {"CLASS_PLAYER_ALLY","CLASS_COMBINE"} -- NPCs with the same class with be allied to each other
+ENT.FriendsWithAllPlayerAllies = true
+ENT.PlayerFriendly = true
 ENT.BloodColor = "Oil" -- The blood type, this will determine what it should use (decal, particle, etc.)
 ENT.HasBloodDecal = false
-ENT.PlayerFriendly = true -- Makes the SNPC friendly to the player and HL2 Resistance
-ENT.HasMeleeAttack = false -- Should the SNPC have a melee attack?
+ENT.HasMeleeAttack = true
+ENT.NextAnyAttackTime_Melee = 0.5
+ENT.MeleeAttackDistance = 35 -- How close does it have to be until it attacks?
+ENT.MeleeAttackDamageDistance = 35 -- How far does the damage go?
+ENT.TimeUntilMeleeAttackDamage = 1 -- This counted in seconds | This calculates the time until it hits something
+ENT.MeleeAttackDamage = 15
+ENT.MeleeAttackBleedEnemy = false -- Should the player bleed when attacked by melee
+ENT.MeleeAttackDamageType = DMG_SLASH
 -- Miscellaneous ---------------------------------------------------------------------------------------------------------------------------------------------
 -- ====== Other Variables ====== --
 ENT.RunAwayOnUnknownDamage = false -- Should run away on damage
@@ -26,7 +34,9 @@ ENT.HasFootStepSound = false
 ENT.SoundTbl_FootStep = {}
 ENT.CanTurnWhileStationary = false
 ENT.HasOnPlayerSight = true
+ENT.HasAllies = true
 
+ENT.VJFriendly = false
 -- ====== Sounds ====== --
 ENT.HasSounds = true
 ENT.SoundTbl_CombatIdle = {
@@ -44,12 +54,28 @@ ENT.SoundTbl_Pain = {
 ENT.SoundTbl_Death = {
 	"physics/metal/metal_large_debris1.wav"
 }
-
-ENT.SoundTbl_Alert = {
-	
+ENT.SoundTbl_MeleeAttack = {
+	"physics/metal/metal_chainlink_impact_soft2.wav",
+	"physics/metal/metal_chainlink_impact_soft3.wav",
+	"physics/metal/metal_chainlink_impact_soft1.wav"
 }
-ENT.SoundTbl_RangeAttack = {
-	
+ENT.SoundTbl_MeleeAttackMiss = {
+
+}
+ENT.EntitiesToNoCollide = {
+	"player",
+	"npc_vj_horde_spectre",
+	"npc_vj_horde_antlion",
+	"npc_vj_horde_smg_turret",
+	"npc_vj_horde_shotgun_turret",
+	"npc_vj_horde_rocket_turret",
+	"npc_vj_horde_laser_turret",
+	"npc_vj_horde_class_survivor",
+	"npc_vj_horde_class_assault",
+	"npc_vj_horde_vortigaunt",
+	"npc_vj_horde_shadow_hulk",
+	"npc_vj_horde_combat_bot",
+	"npc_manhack"
 }
 
 ENT.Horde_Immune_Status = {
@@ -64,40 +90,71 @@ ENT.Horde_Immune_Status = {
 ENT.Immune_AcidPoisonRadiation = true
 
 function ENT:CustomOnInitialize()
-	self:PhysicsInit(SOLID_VPHYSICS)
-	self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
-
+	self.MeleeAttackDamageType = DMG_SLASH
+	self:SetHealth(self.StartHealth)
+	self:AddRelationship("npc_manhack D_LI 99")
+ 
 	timer.Simple(0, function()
 		timer.Simple(0.1, function()
+			self:PhysicsInit(SOLID_VPHYSICS)
+			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 			HORDE:DropTurret(self)
 		end)
 	end)
 end
+ENT.CriticalState = false
+function ENT:CustomOnThink()
+	if self.Critical then
+		if not self.CriticalState then
+			self.HasMeleeAttack = false
+			self:SetCollisionGroup(COLLISION_GROUP_WORLD)
+			self:AddFlags(FL_NOTARGET)
+			self:SetColor(Color(150, 0, 0))
+			self.CriticalState = true
+		else
+			if self:Health() > self:GetMaxHealth() / 2 
+		then
+        		self.Critical = false
+			end
+		end
+	else
+		if self.CriticalState then
+			self.CriticalState = false
+			self:SetColor(Color(255, 255, 255))
+			self.HasMeleeAttack = true
+			self:RemoveFlags(FL_NOTARGET)
+			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+		end
+
+
+
+
+	end
+end
+ENT.Critical = false
+function ENT:CustomOnTakeDamage_AfterDamage(dmginfo, hitgroup)
+    if not self.Critical and self:Health() < self:GetMaxHealth() / 4 then
+        self.Critical = true
+    end
+end
 
 function ENT:CustomOnMeleeAttack_AfterChecks( hitEnt, isProp )
 	if isProp then return end
-	if self:Horde_Debuff_Active[HORDE.Status_Ignite] then
-		local e = EffectData()
-		e:SetOrigin( self:GetPos() )
-		for _, ent in pairs( ents.FindInSphere( self:GetPos(), 150 ) ) do
-			if not ent:IsPlayer() then
-				local Trace = util.TraceLine( {
-					start = self:WorldSpaceCenter(),
-					endpos = ent:WorldSpaceCenter(),
-					mask = MASK_SOLID_BRUSHONLY
-				} )
-				if not Trace.HitWorld then
-					ent:Horde_AddDebuffBuildup( HORDE.Status_Ignite, 50, self )
-				end
-			end
-		end
-		sound.Play( "ambient/energy/newspark07.wav", self:GetPos() )
+
+	if self.Horde_Debuff_Active[HORDE.Status_Ignite] then
+		hitEnt:Horde_AddDebuffBuildup( HORDE.Status_Ignite, 50, self )
+		
+		sound.Play( "", self:GetPos() )
 	end
 end
 function ENT:CustomOnTakeDamage_BeforeDamage( dmginfo, hitgroup )
-	if HORDE:IsFireDamage( dmginfo ) then
-		dmginfo:ScaleDamage( 1.5 )
-	elseif HORDE:IsShockDamage( dmginfo ) then
+	if not self.Critical then
+		if HORDE:IsFireDamage( dmginfo ) then
+			dmginfo:ScaleDamage( 1.5 )
+		elseif HORDE:IsLightningDamage( dmginfo ) then
+			dmginfo:ScaleDamage( 0 )
+		end
+	else
 		dmginfo:ScaleDamage( 0 )
 	end
 end
