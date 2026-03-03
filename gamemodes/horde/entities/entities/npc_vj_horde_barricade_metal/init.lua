@@ -7,6 +7,7 @@ include('shared.lua')
 -----------------------------------------------*/
 ENT.Model = "models/props_c17/concrete_barrier001a.mdl" -- The game will pick a random model from the table when the SNPC is spawned | Add as many as you want
 ENT.StartHealth = 2400
+ENT.CriticalHealthPoint = 100 -- The point in which the entity is disabled
 ENT.SightDistance = 500
 ENT.HullType = HULL_WIDE_SHORT
 ENT.MovementType = VJ_MOVETYPE_STATIONARY
@@ -18,13 +19,16 @@ ENT.FriendsWithAllPlayerAllies = true
 ENT.PlayerFriendly = true
 ENT.BloodColor = "Oil" -- The blood type, this will determine what it should use (decal, particle, etc.)
 ENT.HasBloodDecal = false
+
+
 ENT.HasMeleeAttack = true
 ENT.NextAnyAttackTime_Melee = 0.5
-ENT.MeleeAttackDistance = 35 -- How close does it have to be until it attacks?
+ENT.MeleeAttackDistance = 40 -- How close does it have to be until it attacks?
 ENT.MeleeAttackAngleRadius = 100 -- What is the attack angle radius? | 100 = In front of the SNPC | 180 = All around the SNPC
-ENT.MeleeAttackDamageDistance = 35 -- How far does the damage go?
+ENT.MeleeAttackDamageDistance = 40 -- How far does the damage go?
 ENT.TimeUntilMeleeAttackDamage = 0.1 -- This counted in seconds | This calculates the time until it hits something
-ENT.MeleeAttackDamage = 15
+ENT.MeleeAttackDamage = 30
+ENT.BonusDebuffDamage = 60
 ENT.MeleeAttackBleedEnemy = false -- Should the player bleed when attacked by melee
 ENT.MeleeAttackDamageType = DMG_SLASH
 -- Miscellaneous ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -76,8 +80,10 @@ ENT.EntitiesToNoCollide = {
 	"npc_vj_horde_vortigaunt",
 	"npc_vj_horde_shadow_hulk",
 	"npc_vj_horde_combat_bot",
-	"npc_manhack"
-}
+	"npc_manhack",
+	"npc_vj_horde_barricade_metal",
+	"npc_vj_horde_barricade_wood"
+}-- Really need to make a variable that can be called for all allied NPCs that want it cause im certain this won't work unless the others have us in it aswell... or one call makes em all nocollided? dunno
 
 ENT.Horde_Immune_Status = {
 	[HORDE.Status_Bleeding] = true,
@@ -102,38 +108,42 @@ function ENT:CustomOnInitialize()
 		end)
 	end)
 end
-ENT.CriticalState = false
+ENT.CriticalState = false -- What health state are we in
 function ENT:CustomOnThink()
 	if self.Critical then
+		-- We are Critically Injured
 		if not self.CriticalState then
-			self.HasMeleeAttack = false
-			self:SetCollisionGroup(COLLISION_GROUP_WORLD)
-			self:AddFlags(FL_NOTARGET)
-			self:SetColor(Color(150, 0, 0))
-			self.CriticalState = true
+			-- We Just did
+			self.HasMeleeAttack = false 
+			--We can nolonger fight
+			self:SetCollisionGroup(COLLISION_GROUP_WORLD) -- specifically for barricades
+			self:AddFlags(FL_NOTARGET) -- Stop Attacking us
+			self:SetColor(Color(150, 0, 0)) -- replace with or add wireframe material or bodygroup, if available
+			self.CriticalState = true --
 		else
-			if self:Health() > self:GetMaxHealth() / 2 
-		then
-        		self.Critical = false
+			-- We still are
+			if self:Health() > self:GetMaxHealth() / 2 then -- get back in the fight
+        		self.Critical = false 
 			end
 		end
 	else
-		if self.CriticalState then
+		-- We are not Critical
+		if self.CriticalState then -- Reset Flags if we just returned from crit
 			self.CriticalState = false
 			self:SetColor(Color(255, 255, 255))
 			self.HasMeleeAttack = true
-			self:RemoveFlags(FL_NOTARGET)
-			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+			self:RemoveFlags(FL_NOTARGET) -- we are alive again, attack us
+			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)-- specifically for barricades
 		end
-
+		--Everything else in a normal custom think goes down here
 
 
 
 	end
 end
-ENT.Critical = false
+ENT.Critical = false -- Did we hit the health threshold
 function ENT:CustomOnTakeDamage_AfterDamage(dmginfo, hitgroup)
-    if not self.Critical and self:Health() < self:GetMaxHealth() / 4 then
+    if not self.Critical and self:Health() =< self.CriticalHealthPoint then
         self.Critical = true
     end
 end
@@ -141,28 +151,27 @@ end
 function ENT:CustomOnMeleeAttack_AfterChecks( hitEnt, isProp )
 	if isProp then return end
 
-	if self.Horde_Debuff_Active[HORDE.Status_Shock] then
+	if self.Horde_Debuff_Active and self.Horde_Debuff_Active[HORDE.Status_Shock] then
 		hitEnt:Horde_AddDebuffBuildup( HORDE.Status_Shock, 50, self )
-		
+		local dmg = DamageInfo()
+		dmg:SetDamage( self.BonusDebuffDamage )
+		dmg:SetAttacker( self.Horde_Owner )
+		dmg:SetInflictor(self)
+		dmg:SetDamageType( DMG_SHOCK )
+		dmg:SetDamagePosition(target:GetPos() + target:OBBCenter())
+		hitEnt:TakeDamageInfo(dmg)
 		sound.Play( "", self:GetPos() )
 	end
 end
 function ENT:CustomOnTakeDamage_BeforeDamage( dmginfo, hitgroup )
-	if not self.Critical then
-		if HORDE:IsFireDamage( dmginfo ) then
-			dmginfo:ScaleDamage( 0 )
-		elseif HORDE:IsLightningDamage( dmginfo ) then
-			dmginfo:ScaleDamage( 1.5 )
-		end
-	else
+	if HORDE:IsFireDamage( dmginfo ) then
 		dmginfo:ScaleDamage( 0 )
+	elseif HORDE:IsLightningDamage( dmginfo ) then
+		dmginfo:ScaleDamage( 1.5 )
 	end
+	dmginfo:SetMaxDamage((self:Health() - self.CriticalHealthPoint))
 end
-/*-----------------------------------------------
-	*** Copyright (c) 2012-2017 by DrVrej, All rights reserved. ***
-	No parts of this code or any of its contents may be reproduced, copied, modified or adapted,
-	without the prior written consent of the author, unless otherwise indicated for stand-alone materials.
------------------------------------------------*/
+
 
 VJ.AddNPC("Metal Barricade","npc_vj_horde_barricade_metal", "Horde")
 ENT.Horde_TurretMinion = true
