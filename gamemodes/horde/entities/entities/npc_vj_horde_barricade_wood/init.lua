@@ -5,7 +5,7 @@ include('shared.lua')
 	No parts of this code or any of its contents may be reproduced, copied, modified or adapted,
 	without the prior written consent of the author, unless otherwise indicated for stand-alone materials.
 -----------------------------------------------*/
-ENT.Model = "models/props_c17/concrete_barrier001a.mdl" -- The game will pick a random model from the table when the SNPC is spawned | Add as many as you want
+ENT.Model = "models/props_furniture/bakery_counter3.mdl" -- The game will pick a random model from the table when the SNPC is spawned | Add as many as you want
 ENT.StartHealth = 2400
 ENT.CriticalHealthPoint = 100 -- The point in which the entity is disabled
 ENT.SightDistance = 500
@@ -19,15 +19,20 @@ ENT.FriendsWithAllPlayerAllies = true
 ENT.PlayerFriendly = true
 ENT.BloodColor = "Oil" -- The blood type, this will determine what it should use (decal, particle, etc.)
 ENT.HasBloodDecal = false
+
+
+ENT.DisableDefaultMeleeAttackDamageCode = true
 ENT.HasMeleeAttack = true
 ENT.NextAnyAttackTime_Melee = 0.5
-ENT.MeleeAttackDistance = 40 -- How close does it have to be until it attacks?
-ENT.MeleeAttackDamageDistance = 40 -- How far does the damage go?
+ENT.MeleeAttackDistance = 60 -- How close does it have to be until it attacks?
+ENT.MeleeAttackDamageDistance = 60 -- How far does the damage go?
 ENT.TimeUntilMeleeAttackDamage = 0.1 -- This counted in seconds | This calculates the time until it hits something
 ENT.MeleeAttackDamage = 30
 ENT.BonusDebuffDamage = 60
 ENT.MeleeAttackBleedEnemy = false -- Should the player bleed when attacked by melee
 ENT.MeleeAttackDamageType = DMG_SLASH
+
+
 -- Miscellaneous ---------------------------------------------------------------------------------------------------------------------------------------------
 -- ====== Other Variables ====== --
 ENT.RunAwayOnUnknownDamage = false -- Should run away on damage
@@ -37,7 +42,7 @@ ENT.SoundTbl_FootStep = {}
 ENT.CanTurnWhileStationary = false
 ENT.HasOnPlayerSight = true
 ENT.HasAllies = true
-
+ENT.HasDeathRagdoll = false 
 ENT.VJFriendly = false
 -- ====== Sounds ====== --
 ENT.HasSounds = true
@@ -49,7 +54,7 @@ ENT.SoundTbl_Idle = {
 }
 ENT.SoundTbl_Pain = {
 	"physics/wood/wood_box_impact_bullet3.wav",
-	"pphysics/wood/wood_solid_impact_bullet1.wav",
+	"physics/wood/wood_solid_impact_bullet1.wav",
 	"physics/wood/wood_solid_impact_bullet3.wav"
 }
 
@@ -96,7 +101,7 @@ ENT.Horde_Immune_Status = {
 ENT.Immune_AcidPoisonRadiation = true
 
 function ENT:CustomOnInitialize()
-	self.MeleeAttackDamageType = DMG_SLASH
+	self.Horde_Owner = self:GetNWEntity("HordeOwner")
 	self:SetHealth(self.StartHealth)
 	self:AddRelationship("npc_manhack D_LI 99")
  
@@ -115,7 +120,9 @@ function ENT:CustomOnThink()
 	if self.Critical then
 		-- We are Critically Injured
 		if not self.CriticalState then
-			-- We Just did
+			-- We Just went Crit
+			sound.Play( "physics/wood/wood_furniture_break1.wav", self:GetPos() )
+			-- Make a dying gasp
 			self.HasMeleeAttack = false 
 			--We can nolonger fight
 			self:SetCollisionGroup(COLLISION_GROUP_WORLD) -- specifically for barricades
@@ -140,36 +147,46 @@ function ENT:CustomOnThink()
 		--Everything else in a normal custom think goes down here
 
 
-
+		
 	end
+	-- any thing you want to happen regardless of condition?
 end
+
+
 ENT.Critical = false -- Did we hit the health threshold
 function ENT:CustomOnTakeDamage_AfterDamage(dmginfo, hitgroup)
-    if not self.Critical and self:Health() =< self.CriticalHealthPoint then
+    if not self.Critical and self:Health() <= self.CriticalHealthPoint then
         self.Critical = true
     end
 end
 
 function ENT:CustomOnMeleeAttack_AfterChecks( hitEnt, isProp )
 	if isProp then return end
-
+	local dmg = DamageInfo()
+	dmg:SetAttacker( self.Horde_Owner )
+	dmg:SetInflictor(self)
+	dmg:SetDamage( self.MeleeAttackDamage )
+	dmg:SetDamageType( self.MeleeAttackDamageType )
 	if self.Horde_Debuff_Active and self.Horde_Debuff_Active[HORDE.Status_Ignite] then
 		hitEnt:Horde_AddDebuffBuildup( HORDE.Status_Ignite, 50, self )
-		local dmg = DamageInfo()
-		dmg:SetDamage( self.BonusDebuffDamage )
+		dmg:AddDamage( self.BonusDebuffDamage )
 		dmg:SetAttacker( self )
 		dmg:SetDamageType( DMG_BURN )
 		sound.Play( "ambient/fire/mtov_flame2.wav", self:GetPos() )
-		hitEnt:TakeDamageInfo( dmg )
 	end
+	dmg:SetDamagePosition(hitEnt:GetPos() + hitEnt:OBBCenter())
+	hitEnt:TakeDamageInfo(dmg)
 end
+
 function ENT:CustomOnTakeDamage_BeforeDamage( dmginfo, hitgroup )
-	if HORDE:IsFireDamage( dmginfo ) then
+	if HORDE:IsFireDamage( dmginfo ) 
+	then
 		dmginfo:ScaleDamage( 1.5 )
-	elseif HORDE:IsLightningDamage( dmginfo ) then
+	elseif HORDE:IsLightningDamage( dmginfo ) 
+	then
 		dmginfo:ScaleDamage( 0 )
 	end
-	dmginfo:SetMaxDamage((self:Health() - self.CriticalHealthPoint))
+	dmginfo:SetMaxDamage(math.floor(self:Health() - 100))
 end
 
 VJ.AddNPC("Wood Barricade","npc_vj_horde_barricade_wood", "Horde")
