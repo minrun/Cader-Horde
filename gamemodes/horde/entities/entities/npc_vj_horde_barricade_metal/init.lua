@@ -6,8 +6,8 @@ include('shared.lua')
 	without the prior written consent of the author, unless otherwise indicated for stand-alone materials.
 -----------------------------------------------*/
 ENT.Model = "models/props_fortifications/sandbags_line1.mdl" -- The game will pick a random model from the table when the SNPC is spawned | Add as many as you want
-ENT.StartHealth = 2400
-ENT.CriticalHealthPoint = 100 
+ENT.StartHealth = 300
+ENT.CriticalHealthPoint = 100
 -- The point in which the entity is disabled
 ENT.SightDistance = 500
 ENT.HullType = HULL_HUMAN
@@ -101,11 +101,13 @@ function ENT:CustomOnInitialize()
 	self.Horde_Owner = self:GetNWEntity("HordeOwner")
 	self:SetHealth(self.StartHealth)
 	self:AddRelationship("npc_manhack D_LI 99")
- 
+	self.Horde_NextThink = CurTime()
+	self.Horde_ThinkInterval = 5
+
 	timer.Simple(0, function()
 		timer.Simple(0.1, function()
 			self:PhysicsInit(SOLID_VPHYSICS)
-			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+			self:SetCollisionGroup(COLLISION_GROUP_NONE)
 			HORDE:DropTurret(self)
 		end)
 	end)
@@ -113,22 +115,32 @@ end
 ENT.CriticalState = false 
 -- What health state are we in
 function ENT:CustomOnThink()
+	local curTime = CurTime()
 	if self.Critical then
 		-- We are Critically Injured
 		if not self.CriticalState then
+			local Newpos = self:GetPos()
 			-- We Just did
 			self.HasMeleeAttack = false 
 			--We can nolonger fight
 			self:SetCollisionGroup(COLLISION_GROUP_WORLD) 
-			self:RecheckCollisionFilter()
 			-- specifically for barricades
 			self:AddFlags(FL_NOTARGET) 
 			-- Stop Attacking us
 			self:SetColor(Color(150, 0, 0)) 
+			self:SetModel("models/props_crates/supply_crate02.mdl")
+			self:SetPos(Newpos + (vector_up * 5))
 			-- replace with or add wireframe material or bodygroup, if available
 			self.CriticalState = true --
 		else
 			-- We still are
+			if curTime >= self.Horde_NextThink + self.Horde_ThinkInterval then
+				self:SetModelScale(0,0.001)
+				timer.Simple(0.75,function()
+					self:SetModelScale(1,0.001)
+				end)
+				self.Horde_NextThink = curTime
+			end
 			if self:Health() > self:GetMaxHealth() / 2 then 
 				-- get back in the fight
         		self.Critical = false 
@@ -143,9 +155,9 @@ function ENT:CustomOnThink()
 			self.HasMeleeAttack = true
 			self:RemoveFlags(FL_NOTARGET)
 			self:SetSolid(SOLID_VPHYSICS)
+			self:SetModel(self.Model)
 			 -- we are alive again, attack us
 			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
-			self:RecheckCollisionFilter()
 			-- specifically for barricades
 		end
 		--Everything else in a normal custom think goes down here

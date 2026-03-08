@@ -910,14 +910,6 @@ function HORDE:GetDefaultItemsData()
         "Aperture Science laser turret.\n\nFires tracing laser at the enemy.\nCovers all angles.",
         { Engineer = true },
         10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 3 }, "items/laser_turret.png", { Engineer = 3 }, nil, { HORDE.DMG_BLAST } )
-    HORDE:CreateItem( "Special", "Wooden Barricade", "npc_vj_horde_barricade_wood", 750, 2,
-        "A Barricade that blocks zombies.\nImmune to shock, but vulnerable to fire.\n(Entity Class: npc_vj_horde_barricade_wood)",
-        { Cader= true },
-        10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 4 }, "items/horde_watchtower.png")
-    HORDE:CreateItem( "Special", "Metal Barricade", "npc_vj_horde_barricade_metal", 750, 2,
-        "A watchtower that blocks zombies.\nImmune to fire, but vulnerable to shock.\n(Entity Class: npc_vj_horde_barricade_metal)",
-        { Cader= true },
-        10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 4 }, "items/sniper_turret.png", nil, nil, { HORDE.DMG_SLASH } )
     HORDE:CreateItem( "Special", "Sniper Turret", "npc_vj_horde_sniper_turret", 1500, 4,
         "Combine heavy sniper turret.\n\nCovers a long range and deals heavy damage, but with limited sight.\nAims for the head if possible.",
         { Engineer = true },
@@ -938,6 +930,20 @@ function HORDE:GetDefaultItemsData()
         "An Assault class human that uses automatic rifles. \nUses an M16 rifle with M203 UBGL and stun grenades.",
         { Engineer = true },
         10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 2 }, "items/combine_merc.png", { Engineer = 5 }, nil, { HORDE.DMG_BALLISTIC } )
+    -- New Cader Items
+    HORDE:CreateItem( "Special", "Wooden Barricade", "npc_vj_horde_barricade_wood", 750, 2,
+        "A Barricade that blocks zombies.\nImmune to shock, but vulnerable to fire.\n(Entity Class: npc_vj_horde_barricade_wood)", 
+        { Cader = true },
+         10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 2 }, "items/horde_watchtower.png", nil, nil, { HORDE.DMG_SLASH })
+
+    HORDE:CreateItem( "Special", "Metal Barricade", "npc_vj_horde_barricade_metal", 750, 2,
+        "A watchtower that blocks zombies.\nImmune to fire, but vulnerable to shock.\n(Entity Class: npc_vj_horde_barricade_metal)",
+        { Cader = true }, 10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 2 }, "items/horde_watchtower.png", nil, nil, { HORDE.DMG_SLASH } )
+
+    HORDE:CreateItem( "Special", "M2 Emplacement", "horde_emplacement_basic", 3000, 7,
+        "Guntower Player can use to shoot zombies.\nbasic version, is M2 browning.\n(Entity Class: horde_emplacement_basic)",
+         { Cader = true, Heavy = true, Juggernaut = true },
+          10, -1, { type = HORDE.ENTITY_PROPERTY_DROP, x = 50, z = 15, yaw = 0, limit = 1 }, "items/horde_watchtower.png", nil, nil, { HORDE.DMG_BALLISTIC } )
 
     HORDE:CreateItem( "Special", "Hivehand", "horde_hivehand", 2000, 5,
         "Organic weapon used by Xen soldiers.\nHas infinite ammo.\nPrimary fire generates homing ricocheting shots.\nSecondary fire rapidly unloads the entire weapon.",

@@ -117,39 +117,56 @@ end
 
 ENT.CriticalState = false -- What health state are we in
 function ENT:CustomOnThink()
+	local curTime = CurTime()
 	if self.Critical then
 		-- We are Critically Injured
 		if not self.CriticalState then
-			-- We Just went Crit
-			sound.Play( "physics/wood/wood_furniture_break1.wav", self:GetPos() )
-			-- Make a dying gasp
+			local Newpos = self:GetPos()
+			-- We Just did
 			self.HasMeleeAttack = false 
 			--We can nolonger fight
-			self:SetCollisionGroup(COLLISION_GROUP_WORLD) -- specifically for barricades
-			self:AddFlags(FL_NOTARGET) -- Stop Attacking us
-			self:SetColor(Color(150, 0, 0)) -- replace with or add wireframe material or bodygroup, if available
+			self:SetCollisionGroup(COLLISION_GROUP_WORLD) 
+			-- specifically for barricades
+			self:AddFlags(FL_NOTARGET) 
+			-- Stop Attacking us
+			self:SetColor(Color(150, 0, 0)) 
+			self:SetModel("models/props_crates/supply_crate02.mdl")
+			self:SetPos(Newpos + (vector_up * 5))
+			-- replace with or add wireframe material or bodygroup, if available
 			self.CriticalState = true --
 		else
 			-- We still are
-			if self:Health() > self:GetMaxHealth() / 2 then -- get back in the fight
+			if curTime >= self.Horde_NextThink + self.Horde_ThinkInterval then
+				self:SetModelScale(0,0.001)
+				timer.Simple(0.75,function()
+					self:SetModelScale(1,0.001)
+				end)
+				self.Horde_NextThink = curTime
+			end
+			if self:Health() > self:GetMaxHealth() / 2 then 
+				-- get back in the fight
         		self.Critical = false 
 			end
 		end
 	else
 		-- We are not Critical
-		if self.CriticalState then -- Reset Flags if we just returned from crit
+		if self.CriticalState then 
+			-- Reset Flags if we just returned from crit
 			self.CriticalState = false
 			self:SetColor(Color(255, 255, 255))
 			self.HasMeleeAttack = true
-			self:RemoveFlags(FL_NOTARGET) -- we are alive again, attack us
-			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)-- specifically for barricades
+			self:RemoveFlags(FL_NOTARGET)
+			self:SetSolid(SOLID_VPHYSICS)
+			self:SetModel(self.Model)
+			 -- we are alive again, attack us
+			self:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+			-- specifically for barricades
 		end
 		--Everything else in a normal custom think goes down here
 
 
-		
+
 	end
-	-- any thing you want to happen regardless of condition?
 end
 
 
